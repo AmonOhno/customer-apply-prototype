@@ -1,6 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import { reducer } from './domain/reducer.ts';
 import { createInitialState } from './domain/seed.ts';
+import { DEFAULT_ROW_ACCESS } from './domain/rowAccess.ts';
 import type { AppState } from './domain/types.ts';
 
 const STORAGE_KEY = 'torihikisaki-master:v1';
@@ -10,7 +11,8 @@ function load(): AppState {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const s = JSON.parse(raw) as AppState;
-      if (s.schema === 1 && Array.isArray(s.rows)) return { ...s, notice: undefined };
+      // 閲覧範囲の導入前に保存したデータには既定の閲覧範囲を補う
+      if (s.schema === 1 && Array.isArray(s.rows)) return { ...s, rowAccess: s.rowAccess ?? DEFAULT_ROW_ACCESS, notice: undefined };
     }
   } catch {
     // ストレージが使えない環境では初期データで動かす

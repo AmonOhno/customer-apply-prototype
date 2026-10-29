@@ -131,7 +131,8 @@ export interface QueryResult {
 
 export function applyQuery(ctx: GridContext, allRows: GridRow[], q: QueryDef, now: number = Date.now()): QueryResult {
   const { state, user } = ctx;
-  const cols = state.columns;
+  // 閲覧権限のない項目は列として表示しない
+  const cols = state.columns.filter((c) => canRead(c, user.role));
   const committed = new Map(state.rows.map((r) => [r.id, r]));
   const viewsOf = new Map<string, CellView[]>();
   const views = (row: GridRow) => {

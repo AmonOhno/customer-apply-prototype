@@ -178,7 +178,6 @@ textarea { resize: vertical; width: 100%; }
 .chip.st-rejected i { background: var(--rejected-bg); border-color: var(--rejected); }
 .chip.st-approved i { background: var(--approved-bg); border-color: var(--approved); }
 .chip.st-clean i { background: var(--surface); border-color: var(--line-strong); }
-.locked-chip { color: var(--muted); }
 .comment-chip i { border: 0; border-radius: 0; background: linear-gradient(225deg, var(--accent) 0 5px, var(--line-strong) 5px 6px, transparent 6px); }
 
 /* ---------- Grid ---------- */
@@ -204,7 +203,6 @@ textarea { resize: vertical; width: 100%; }
 }
 .colhead button:hover { background: var(--accent-soft); }
 .colhead.active { box-shadow: inset 0 -2px 0 var(--accent); }
-.colhead.noread .colname { color: var(--muted); }
 .colname { font-weight: 600; font-size: 12px; letter-spacing: 0.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .req { color: var(--rejected); margin-left: 2px; }
 .colmeta { display: flex; gap: 3px; flex-wrap: nowrap; }
@@ -441,6 +439,21 @@ textarea { resize: vertical; width: 100%; }
 .switch input:disabled + .track { opacity: 0.5; }
 .switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
 
+/* ---------- Row access settings ---------- */
+.settings-table td.left { text-align: left; white-space: normal; }
+.warn-text { color: var(--warn); font-size: 12px; }
+.danger-text { color: var(--rejected); }
+.access-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.access-rule { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+.access-rule-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.access-rule-head .btn { margin-left: auto; }
+.access-roles { border: 0; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 16px; }
+.access-roles legend, .access-conds-label { font-size: 12px; font-weight: 600; color: var(--muted); padding: 0; margin-bottom: 4px; }
+.access-conds { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+.access-cond { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.access-values { display: inline-flex; flex-wrap: wrap; gap: 4px 12px; }
+.access-text { width: 240px; max-width: 100%; }
+
 /* ---------- Toast ---------- */
 .toast {
   position: fixed; z-index: 70; left: 50%; transform: translateX(-50%);
@@ -485,6 +498,7 @@ textarea { resize: vertical; width: 100%; }
   .form-grid label { padding-top: 0; }
   .cs-summary { grid-template-columns: 1fr auto; }
   .cs-summary .cs-status { grid-column: 1 / -1; justify-self: start; }
+  .access-rule-head .label-input { width: 100%; }
 }
 @media (min-width: 961px) {
   .app { height: 100%; }

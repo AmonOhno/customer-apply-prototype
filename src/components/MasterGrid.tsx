@@ -66,7 +66,9 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
   }, [ctx, searched]);
 
   const { rows, columns: cols } = useMemo(() => applyQuery(ctx, searched, activeQuery), [ctx, searched, activeQuery]);
-  const hiddenCols = state.columns.length - cols.length;
+  // 閲覧権限のない項目は数えず、クエリで絞った項目数だけを示す
+  const readableCols = state.columns.filter((c) => canRead(c, user.role)).length;
+  const hiddenCols = readableCols - cols.length;
 
   const views = useMemo(() => rows.map((row) => cols.map((c) => cellView(ctx, row, c))), [rows, cols, ctx]);
 
@@ -305,7 +307,7 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
           <span className="muted">{activeQuery.description}</span>
           <span className="query-stat">
             {rows.length}/{allRows.length}件
-            {hiddenCols > 0 && <>・{cols.length}/{state.columns.length}項目を表示</>}
+            {hiddenCols > 0 && <>・{cols.length}/{readableCols}項目を表示</>}
           </span>
         </p>
       </div>
@@ -314,7 +316,6 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
         {(['draft', 'new', 'pending', 'rejected', 'approved'] as const).map((s) => (
           <span key={s} className={`chip st-${s}`}><i />{STATUS_LABEL[s]}</span>
         ))}
-        <span className="chip locked-chip"><Icon name="lock" />閲覧権限なし</span>
         <span className="chip comment-chip"><i />コメントあり</span>
         <span className="hint">ドラッグ・Shift+クリックで範囲選択／入力後 Ctrl+Enter で範囲に一括入力／Excel から貼り付け可</span>
       </div>
@@ -401,7 +402,11 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
               </tbody>
             </table>
             {rows.length === 0 && (
-              <p className="empty">条件に合う取引先がありません。検索語を変えるか、クエリを「すべて」に戻してください。</p>
+              <p className="empty">
+                {allRows.length === 0
+                  ? '閲覧できる取引先がありません。閲覧範囲はマスタ管理者が設定します。'
+                  : '条件に合う取引先がありません。検索語を変えるか、クエリを「すべて」に戻してください。'}
+              </p>
             )}
           </div>
         </div>
@@ -448,10 +453,9 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
 function ColumnHeader({ col, role, left, active, onSelect }: {
   col: ColumnDef; role: Role; left?: number; active: boolean; onSelect: () => void;
 }) {
-  const readable = canRead(col, role);
   const editable = canEditColumn(col, role);
   return (
-    <th scope="col" className={`colhead ${left !== undefined ? 'frozen' : ''} ${active ? 'active' : ''} ${readable ? '' : 'noread'}`}
+    <th scope="col" className={`colhead ${left !== undefined ? 'frozen' : ''} ${active ? 'active' : ''}`}
       style={left !== undefined ? { left } : undefined}>
       <button type="button" onClick={onSelect} title={`${col.label}の列を選択`}>
         <span className="colname">
@@ -459,10 +463,9 @@ function ColumnHeader({ col, role, left, active, onSelect }: {
           {col.required && <span className="req" aria-label="必須">*</span>}
         </span>
         <span className="colmeta">
-          {!readable ? <span className="tag mute"><Icon name="lock" />閲覧不可</span>
-            : !editable ? <span className="tag mute">参照のみ</span>
+          {!editable ? <span className="tag mute">参照のみ</span>
             : col.immutable ? <span className="tag mute">新規時のみ</span> : null}
-          {col.sensitive && readable && <span className="tag warn">機密</span>}
+          {col.sensitive && <span className="tag warn">機密</span>}
           {!col.approvalRequired && <span className="tag ok">承認不要</span>}
         </span>
       </button>

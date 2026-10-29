@@ -1,4 +1,5 @@
 import { canRead, lockReason, pendingIndex, type LockReason } from './permissions.ts';
+import { canSeeValues } from './rowAccess.ts';
 import type { AppState, CellValue, ColumnDef, User } from './types.ts';
 import { cellKey } from './types.ts';
 import { formatValue, validateValue } from './validation.ts';
@@ -45,9 +46,14 @@ export function userDrafts(state: AppState, userId: string) {
   return state.drafts[userId] ?? { cells: {}, newRows: [] };
 }
 
+/**
+ * 利用者に表示する行。確定済み行・申請中の新規行は閲覧範囲で絞り込む。
+ * 自分の新規行（下書き）と自分が申請中の新規行は、入力内容にかかわらず表示する
+ */
 export function buildGridRows(state: AppState, user: User): GridRow[] {
   const drafts = userDrafts(state, user.id);
   const committed: GridRow[] = state.rows
+    .filter((r) => canSeeValues(state, user.role, r.values))
     .map((r) => {
       const values = { ...r.values };
       let rejectedFrom: string | undefined;
@@ -64,7 +70,9 @@ export function buildGridRows(state: AppState, user: User): GridRow[] {
 
   const pendingNew: GridRow[] = state.changeSets
     .filter((cs) => cs.status === 'pending')
-    .flatMap((cs) => cs.newRows.map((nr) => ({ id: nr.id, kind: 'pending-new' as const, values: nr.values, changeSetId: cs.id, comments: nr.comments })));
+    .flatMap((cs) => cs.newRows
+      .filter((nr) => cs.requesterId === user.id || canSeeValues(state, user.role, nr.values))
+      .map((nr) => ({ id: nr.id, kind: 'pending-new' as const, values: nr.values, changeSetId: cs.id, comments: nr.comments })));
 
   const draftNew: GridRow[] = drafts.newRows.map((nr) => ({
     id: nr.id, kind: 'draft-new' as const, values: nr.values, rejectedFrom: nr.rejectedFrom, comments: nr.comments,

@@ -1,4 +1,5 @@
 import { DEFAULT_COLUMNS, DEFAULT_USERS, PAYMENT_TERMS } from './columns.ts';
+import { DEFAULT_ROW_ACCESS } from './rowAccess.ts';
 import type { AppState, MasterRow } from './types.ts';
 
 /** デモ用の架空データ。実在の企業とは関係ありません。 */
@@ -75,6 +76,7 @@ export function createInitialState(at: string = new Date().toISOString()): AppSt
     users: DEFAULT_USERS,
     currentUserId: DEFAULT_USERS[0].id,
     columns: DEFAULT_COLUMNS,
+    rowAccess: DEFAULT_ROW_ACCESS,
     rows: seedRows(at),
     drafts: {},
     changeSets: [],

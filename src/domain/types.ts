@@ -25,7 +25,7 @@ export interface ColumnDef {
   min?: number;
   pattern?: string;
   patternMessage?: string;
-  /** 閲覧できるロール。含まれないロールにはマスク表示 */
+  /** 閲覧できるロール。含まれないロールには項目（列）自体を表示しない */
   readRoles: Role[];
   /** 編集できるロール（閲覧権限が前提） */
   editRoles: Role[];
@@ -107,6 +107,26 @@ export interface HistoryEntry {
   comment?: string;
 }
 
+/** 閲覧範囲の条件。確定値で判定する（新規行は入力値） */
+export interface AccessCondition {
+  colKey: string;
+  op: 'in' | 'notIn' | 'empty' | 'notEmpty';
+  /** in / notIn で比較する値 */
+  values: string[];
+}
+
+/**
+ * 閲覧範囲：マスタ管理者が定義する行の絞り込み条件（クエリ）と、それを閲覧できるロールの紐づけ。
+ * 利用者は、自分のロールに紐づくいずれかの閲覧範囲に該当する行だけを閲覧・編集できる。
+ */
+export interface RowAccessRule {
+  id: string;
+  label: string;
+  /** すべてを満たす行が対象（空なら全行） */
+  conditions: AccessCondition[];
+  roles: Role[];
+}
+
 export interface Notice {
   kind: 'error' | 'info';
   text: string;
@@ -118,6 +138,7 @@ export interface AppState {
   users: User[];
   currentUserId: string;
   columns: ColumnDef[];
+  rowAccess: RowAccessRule[];
   rows: MasterRow[];
   drafts: Record<string, UserDrafts>;
   changeSets: ChangeSet[];
