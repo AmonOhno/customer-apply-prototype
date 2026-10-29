@@ -1,14 +1,15 @@
 import { useMemo, useState } from 'react';
 import { currentUser } from '../domain/permissions.ts';
 import { validateDrafts } from '../domain/reducer.ts';
-import type { AppState } from '../domain/types.ts';
+import type { AppState, NewRow } from '../domain/types.ts';
 import { splitCellKey } from '../domain/types.ts';
 import { formatValue } from '../domain/validation.ts';
 import { Modal } from './Modal.tsx';
 
-export function SubmitDialog({ state, onSubmit, onClose }: {
+export function SubmitDialog({ state, onSubmit, onComment, onClose }: {
   state: AppState;
   onSubmit: (title: string, comment: string) => void;
+  onComment: (rowId: string, colKey: string, comment: string) => void;
   onClose: () => void;
 }) {
   const user = currentUser(state);
@@ -21,12 +22,14 @@ export function SubmitDialog({ state, onSubmit, onClose }: {
     const { rowId, colKey } = splitCellKey(k);
     const row = state.rows.find((r) => r.id === rowId);
     const col = state.columns.find((c) => c.key === colKey)!;
-    return { k, row, col, before: row?.values[colKey] ?? null, after: cell.value };
+    return { k, rowId, row, col, before: row?.values[colKey] ?? null, after: cell.value, comment: cell.comment ?? '' };
   }).sort((a, b) => String(a.row?.values.code).localeCompare(String(b.row?.values.code)));
 
   const direct = lines.filter((l) => !l.col.approvalRequired);
   const wfCount = lines.length - direct.length + d.newRows.length;
   const rowCount = new Set(lines.map((l) => l.row?.id)).size;
+  const commentLabels = (nr: NewRow) => Object.entries(nr.comments ?? {})
+    .map(([k, c]) => `${state.columns.find((col) => col.key === k)?.label ?? k}：${c}`);
 
   return (
     <Modal
@@ -62,12 +65,16 @@ export function SubmitDialog({ state, onSubmit, onClose }: {
       <h3 className="sub">変更内容（{rowCount}社・{lines.length}セル{d.newRows.length ? `／新規${d.newRows.length}社` : ''}）</h3>
       <div className="diff-wrap">
         <table className="diff">
-          <thead><tr><th>取引先</th><th>項目</th><th>変更前</th><th>変更後</th></tr></thead>
+          <thead><tr><th>取引先</th><th>項目</th><th>変更前</th><th>変更後</th><th>コメント（申請の意図）</th></tr></thead>
           <tbody>
             {d.newRows.map((nr) => (
               <tr key={nr.id} className="new">
                 <td><span className="mono">{String(nr.values.code ?? '')}</span> {String(nr.values.name ?? '')}</td>
                 <td colSpan={3}><span className="tag ok">新規登録</span></td>
+                <td className="comment-cell">
+                  {commentLabels(nr).length ? commentLabels(nr).map((t, i) => <div key={i}>{t}</div>)
+                    : <span className="muted">表のセルを選んで右パネルで入力</span>}
+                </td>
               </tr>
             ))}
             {lines.map((l) => (
@@ -76,6 +83,10 @@ export function SubmitDialog({ state, onSubmit, onClose }: {
                 <td>{l.col.label}{!l.col.approvalRequired && <span className="tag ok">承認不要</span>}</td>
                 <td className="before">{formatValue(l.col, l.before) || '（空）'}</td>
                 <td className="after">{formatValue(l.col, l.after) || '（空）'}</td>
+                <td className="comment-cell">
+                  <input aria-label={`${String(l.row?.values.name ?? '')} ${l.col.label}のコメント`} value={l.comment}
+                    onChange={(e) => onComment(l.rowId, l.col.key, e.target.value)} placeholder="変更の意図（任意）" />
+                </td>
               </tr>
             ))}
           </tbody>

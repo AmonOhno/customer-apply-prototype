@@ -15,6 +15,7 @@ const PATHS: Record<string, string> = {
   sliders: 'M3 4.5h10M3 11.5h10M6 3v3M10 10v3',
   history: 'M3 8a5 5 0 1 0 1.5-3.6M3 2.5v2.5h2.5M8 5.5V8l2 1.5',
   pencil: 'M10.5 2.8l2.7 2.7-7.7 7.7H2.8v-2.7z',
+  comment: 'M2.5 3.5h11v7.5H7L4 13.5V11H2.5z',
 };
 
 export function Icon({ name, label }: { name: keyof typeof PATHS | string; label?: string }) {

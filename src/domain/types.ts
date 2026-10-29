@@ -52,12 +52,16 @@ export interface DraftCell {
   value: CellValue;
   base: CellValue;
   rejectedFrom?: string;
+  /** セルコメント：申請者が記載する変更の意図。承認者も確認する */
+  comment?: string;
 }
 
 export interface NewRow {
   id: string;
   values: Record<string, CellValue>;
   rejectedFrom?: string;
+  /** セルコメント（key = colKey） */
+  comments?: Record<string, string>;
 }
 
 export interface UserDrafts {
@@ -73,6 +77,7 @@ export interface CellChange {
   colKey: string;
   before: CellValue;
   after: CellValue;
+  comment?: string;
 }
 
 /** 変更セット：まとめて申請・承認される単位 */
@@ -99,6 +104,7 @@ export interface HistoryEntry {
   after: CellValue;
   changeSetId?: string;
   kind: 'approved' | 'direct' | 'created';
+  comment?: string;
 }
 
 export interface Notice {

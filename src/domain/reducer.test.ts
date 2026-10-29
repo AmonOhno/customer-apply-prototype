@@ -184,3 +184,63 @@ test('取り下げで下書きに戻る（差戻し扱いではない）', () =>
   assert.equal(s.changeSets[0].status, 'withdrawn');
   assert.equal(s.drafts[TANAKA].cells[cellKey(r.id, 'tel')].rejectedFrom, undefined);
 });
+
+test('セルコメント: 申請 → 変更セット → 承認後の履歴まで引き継がれ、承認者のセル表示でも見える', () => {
+  const s0 = base();
+  const r = row1(s0);
+  let s = run(s0,
+    { type: 'EDIT_CELLS', edits: [{ rowId: r.id, colKey: 'address', value: '東京都港区芝公園4-2-8' }] },
+    { type: 'SET_CELL_COMMENT', rowId: r.id, colKey: 'address', comment: '  本社移転の通知（10/28受領） ' },
+    { type: 'SUBMIT', title: '', comment: '', at: AT },
+  );
+  assert.equal(s.changeSets[0].changes[0].comment, '本社移転の通知（10/28受領）');
+
+  s = run(s, as(SUZUKI));
+  const suzuki = s.users.find((u) => u.id === SUZUKI)!;
+  const addr = s.columns.find((c) => c.key === 'address')!;
+  const gr = buildGridRows(s, suzuki).find((g) => g.id === r.id)!;
+  assert.equal(cellView(buildContext(s, suzuki), gr, addr).comment, '本社移転の通知（10/28受領）');
+
+  s = run(s, { type: 'APPROVE', changeSetId: s.changeSets[0].id, comment: '', at: AT });
+  assert.equal(s.history.at(-1)?.comment, '本社移転の通知（10/28受領）');
+});
+
+test('セルコメント: 値を変更していないセルには付けられない／値の再編集では消えない／差戻しで下書きに戻る', () => {
+  const s0 = base();
+  const r = row1(s0);
+  const none = run(s0, { type: 'SET_CELL_COMMENT', rowId: r.id, colKey: 'tel', comment: 'x' });
+  assert.equal(none.notice?.kind, 'error');
+
+  let s = run(s0,
+    { type: 'EDIT_CELLS', edits: [{ rowId: r.id, colKey: 'tel', value: '03-1111-2222' }] },
+    { type: 'SET_CELL_COMMENT', rowId: r.id, colKey: 'tel', comment: '代表番号の変更' },
+    { type: 'EDIT_CELLS', edits: [{ rowId: r.id, colKey: 'tel', value: '03-1111-3333' }] },
+  );
+  assert.equal(s.drafts[TANAKA].cells[cellKey(r.id, 'tel')].comment, '代表番号の変更');
+
+  s = run(s, { type: 'SUBMIT', title: '', comment: '', at: AT },
+    as(SUZUKI), { type: 'REJECT', changeSetId: 'CS-0001', comment: '番号を再確認', at: AT });
+  assert.equal(s.drafts[TANAKA].cells[cellKey(r.id, 'tel')].comment, '代表番号の変更');
+});
+
+test('セルコメント: 新規行のセルにも付けられ、閲覧権限のない項目のコメントはマスクされる', () => {
+  let s = run(base(), as(ADMIN), { type: 'ADD_ROW' });
+  const nr = s.drafts[ADMIN].newRows[0];
+  s = run(s,
+    { type: 'EDIT_CELLS', edits: [
+      { rowId: nr.id, colKey: 'code', value: 'V90002' },
+      { rowId: nr.id, colKey: 'name', value: '株式会社テスト' },
+      { rowId: nr.id, colKey: 'bank', value: 'みずほ銀行 本店 普通 1234567', comment: '口座開設届に基づく' },
+    ] },
+  );
+  if (s.notice?.kind === 'error') assert.fail(s.notice.text);
+  assert.equal(s.drafts[ADMIN].newRows[0].comments?.bank, '口座開設届に基づく');
+  s = run(s, { type: 'SUBMIT', title: '', comment: '', at: AT });
+  assert.equal(s.changeSets.at(-1)?.newRows[0].comments?.bank, '口座開設届に基づく');
+
+  s = run(s, as(TANAKA));
+  const tanaka = s.users[0];
+  const bank = s.columns.find((c) => c.key === 'bank')!;
+  const gr = buildGridRows(s, tanaka).find((g) => g.id === nr.id)!;
+  assert.equal(cellView(buildContext(s, tanaka), gr, bank).comment, undefined);
+});
