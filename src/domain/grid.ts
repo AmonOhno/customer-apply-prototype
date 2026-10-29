@@ -12,6 +12,8 @@ export interface GridRow {
   values: Record<string, CellValue>;
   changeSetId?: string;
   rejectedFrom?: string;
+  /** 新規行のセルコメント（key = colKey） */
+  comments?: Record<string, string>;
 }
 
 export type CellStatus = 'clean' | 'draft' | 'pending' | 'rejected' | 'approved' | 'new';
@@ -24,6 +26,8 @@ export interface CellView {
   lock: LockReason;
   error: string | null;
   changeSetId?: string;
+  /** セルコメント（申請の意図）。閲覧権限がなければ持たない */
+  comment?: string;
 }
 
 export const STATUS_LABEL: Record<CellStatus, string> = {
@@ -60,10 +64,10 @@ export function buildGridRows(state: AppState, user: User): GridRow[] {
 
   const pendingNew: GridRow[] = state.changeSets
     .filter((cs) => cs.status === 'pending')
-    .flatMap((cs) => cs.newRows.map((nr) => ({ id: nr.id, kind: 'pending-new' as const, values: nr.values, changeSetId: cs.id })));
+    .flatMap((cs) => cs.newRows.map((nr) => ({ id: nr.id, kind: 'pending-new' as const, values: nr.values, changeSetId: cs.id, comments: nr.comments })));
 
   const draftNew: GridRow[] = drafts.newRows.map((nr) => ({
-    id: nr.id, kind: 'draft-new' as const, values: nr.values, rejectedFrom: nr.rejectedFrom,
+    id: nr.id, kind: 'draft-new' as const, values: nr.values, rejectedFrom: nr.rejectedFrom, comments: nr.comments,
   }));
 
   return [...committed, ...pendingNew, ...draftNew];
@@ -74,6 +78,8 @@ export interface GridContext {
   user: User;
   pending: Map<string, string>;
   recentApproved: Set<string>;
+  /** 承認待ちセル → 申請時のセルコメント */
+  pendingComments: Map<string, string>;
 }
 
 export function buildContext(state: AppState, user: User, now: number = Date.now()): GridContext {
@@ -86,7 +92,12 @@ export function buildContext(state: AppState, user: User, now: number = Date.now
     seen.add(k);
     if (h.kind === 'approved' && now - Date.parse(h.at) < 24 * 3600 * 1000) recentApproved.add(k);
   }
-  return { state, user, pending: pendingIndex(state), recentApproved };
+  const pendingComments = new Map<string, string>();
+  for (const cs of state.changeSets) {
+    if (cs.status !== 'pending') continue;
+    for (const ch of cs.changes) if (ch.comment) pendingComments.set(cellKey(ch.rowId, ch.colKey), ch.comment);
+  }
+  return { state, user, pending: pendingIndex(state), recentApproved, pendingComments };
 }
 
 export function cellView(ctx: GridContext, row: GridRow, col: ColumnDef): CellView {
@@ -98,23 +109,28 @@ export function cellView(ctx: GridContext, row: GridRow, col: ColumnDef): CellVi
   let status: CellStatus = 'clean';
   let changeSetId: string | undefined;
   let error: string | null = null;
+  let comment: string | undefined;
 
   if (row.kind === 'draft-new') {
     status = row.rejectedFrom ? 'rejected' : 'new';
     changeSetId = row.rejectedFrom;
+    comment = row.comments?.[col.key];
     if (!lock) error = validateValue(col, value);
   } else if (row.kind === 'pending-new') {
     status = 'pending';
     changeSetId = row.changeSetId;
+    comment = row.comments?.[col.key];
   } else {
     const d = userDrafts(state, user.id).cells[k];
     if (d) {
       status = d.rejectedFrom ? 'rejected' : 'draft';
       changeSetId = d.rejectedFrom;
       error = validateValue(col, d.value);
+      comment = d.comment;
     } else if (ctx.pending.has(k)) {
       status = 'pending';
       changeSetId = ctx.pending.get(k);
+      comment = ctx.pendingComments.get(k);
     } else if (ctx.recentApproved.has(k)) {
       status = 'approved';
     }
@@ -128,5 +144,6 @@ export function cellView(ctx: GridContext, row: GridRow, col: ColumnDef): CellVi
     lock,
     error: masked ? null : error,
     changeSetId,
+    comment: masked ? undefined : comment?.trim() ? comment : undefined,
   };
 }

@@ -10,12 +10,15 @@ export interface CellEdit {
   rowId: string;
   colKey: string;
   value: CellValue;
+  /** 指定するとセルコメントも設定する（空文字で削除） */
+  comment?: string;
 }
 
 export type Action =
   | { type: 'SET_USER'; userId: string }
   | { type: 'EDIT_CELLS'; edits: CellEdit[] }
   | { type: 'ADD_ROW' }
+  | { type: 'SET_CELL_COMMENT'; rowId: string; colKey: string; comment: string }
   | { type: 'REMOVE_NEW_ROW'; rowId: string }
   | { type: 'DISCARD_DRAFTS'; keys?: string[] }
   | { type: 'SUBMIT'; title: string; comment: string; at: string }
@@ -27,6 +30,17 @@ export type Action =
   | { type: 'RESET'; state: AppState };
 
 const emptyDrafts = (): UserDrafts => ({ cells: {}, newRows: [] });
+
+/** 入力途中の空白は残し、空のコメントは持たない */
+const normComment = (c: string | undefined): string | undefined => (c && c.trim() ? c : undefined);
+
+function setRowComment(nr: NewRow, colKey: string, comment: string): NewRow {
+  const comments = { ...nr.comments };
+  const c = normComment(comment);
+  if (c) comments[colKey] = c;
+  else delete comments[colKey];
+  return { ...nr, comments };
+}
 
 function withDrafts(state: AppState, userId: string, fn: (d: UserDrafts) => UserDrafts): AppState {
   const cur = state.drafts[userId] ?? emptyDrafts();
@@ -77,7 +91,7 @@ function returnToDrafts(state: AppState, cs: ChangeSet, rejected: boolean): AppS
       const k = cellKey(ch.rowId, ch.colKey);
       if (cells[k]) continue;
       const cur = state.rows.find((r) => r.id === ch.rowId)?.values[ch.colKey] ?? null;
-      cells[k] = { value: ch.after, base: cur, rejectedFrom: rejected ? cs.id : undefined };
+      cells[k] = { value: ch.after, base: cur, rejectedFrom: rejected ? cs.id : undefined, comment: ch.comment };
     }
     const newRows = [...d.newRows, ...cs.newRows.map((nr) => ({ ...nr, rejectedFrom: rejected ? cs.id : undefined }))];
     return { cells, newRows };
@@ -106,7 +120,7 @@ export function reducer(state: AppState, action: Action): AppState {
       const pending = pendingIndex(state);
       const drafts = state.drafts[user.id] ?? emptyDrafts();
       const cells = { ...drafts.cells };
-      const newRows = drafts.newRows.map((r) => ({ ...r, values: { ...r.values } }));
+      let newRows = drafts.newRows.map((r) => ({ ...r, values: { ...r.values } }));
       let applied = 0;
       let skipped = 0;
       for (const e of action.edits) {
@@ -116,6 +130,7 @@ export function reducer(state: AppState, action: Action): AppState {
         if (nr) {
           if (lockReason(state, user, e.rowId, 'draft-new', col, pending)) { skipped++; continue; }
           nr.values[col.key] = e.value;
+          if (e.comment !== undefined) newRows = newRows.map((r) => r.id === nr.id ? setRowComment(r, col.key, e.comment!) : r);
           applied++;
           continue;
         }
@@ -124,7 +139,10 @@ export function reducer(state: AppState, action: Action): AppState {
         const k = cellKey(row.id, col.key);
         const base = row.values[col.key] ?? null;
         if (sameValue(e.value, base)) delete cells[k];
-        else cells[k] = { value: e.value, base: cells[k]?.base ?? base, rejectedFrom: cells[k]?.rejectedFrom };
+        else {
+          const comment = e.comment !== undefined ? normComment(e.comment) : cells[k]?.comment;
+          cells[k] = { value: e.value, base: cells[k]?.base ?? base, rejectedFrom: cells[k]?.rejectedFrom, comment };
+        }
         applied++;
       }
       let next: AppState = { ...state, drafts: { ...state.drafts, [user.id]: { cells, newRows } } };
@@ -147,6 +165,21 @@ export function reducer(state: AppState, action: Action): AppState {
       values.paymentTerms = PAYMENT_TERMS[0];
       values.status = '取引中';
       return withDrafts({ ...s, notice: undefined }, user.id, (d) => ({ ...d, newRows: [...d.newRows, { id, values }] }));
+    }
+
+    case 'SET_CELL_COMMENT': {
+      const col = state.columns.find((c) => c.key === action.colKey);
+      if (!col) return state;
+      const drafts = state.drafts[user.id] ?? emptyDrafts();
+      const nr = drafts.newRows.find((r) => r.id === action.rowId);
+      if (nr) {
+        if (lockReason(state, user, nr.id, 'draft-new', col)) return err(state, 'このセルにはコメントを付けられません');
+        return withDrafts(state, user.id, (d) => ({ ...d, newRows: d.newRows.map((r) => r.id === nr.id ? setRowComment(r, col.key, action.comment) : r) }));
+      }
+      const k = cellKey(action.rowId, action.colKey);
+      const cell = drafts.cells[k];
+      if (!cell) return err(state, 'コメントは値を変更したセルに付けられます');
+      return withDrafts(state, user.id, (d) => ({ ...d, cells: { ...d.cells, [k]: { ...cell, comment: normComment(action.comment) } } }));
     }
 
     case 'REMOVE_NEW_ROW':
@@ -176,6 +209,8 @@ export function reducer(state: AppState, action: Action): AppState {
         const row = state.rows.find((r) => r.id === rowId);
         if (!col || !row) continue;
         const ch: CellChange = { rowId, colKey, before: row.values[colKey] ?? null, after: cell.value };
+        const comment = cell.comment?.trim();
+        if (comment) ch.comment = comment;
         (col.approvalRequired ? wf : direct).push(ch);
       }
 
@@ -209,7 +244,10 @@ export function reducer(state: AppState, action: Action): AppState {
           createdAt: action.at,
           status: 'pending',
           changes: wf,
-          newRows: d.newRows.map(({ rejectedFrom: _r, ...nr }) => nr),
+          newRows: d.newRows.map(({ rejectedFrom: _r, comments, ...nr }) => {
+            const trimmed = Object.entries(comments ?? {}).map(([k, c]) => [k, c.trim()] as const).filter(([, c]) => c);
+            return trimmed.length ? { ...nr, comments: Object.fromEntries(trimmed) } : nr;
+          }),
         };
         s = { ...s2, changeSets: [...s2.changeSets, cs] };
       }
@@ -254,7 +292,12 @@ export function reducer(state: AppState, action: Action): AppState {
         const [rid, s2] = nextId(s, 'r');
         s = s2;
         rows.push({ id: rid, values: { ...nr.values }, createdAt: action.at, updatedAt: action.at });
-        hist.push({ rowId: rid, colKey: 'code', before: null, after: nr.values.code ?? null, at: action.at, by: cs.requesterId, changeSetId: cs.id, kind: 'created' });
+        hist.push({ rowId: rid, colKey: 'code', before: null, after: nr.values.code ?? null, at: action.at, by: cs.requesterId, changeSetId: cs.id, kind: 'created', comment: nr.comments?.code });
+        // 新規行のコード以外のセルコメントも、各セルの履歴で確認できるよう残す
+        for (const [colKey, comment] of Object.entries(nr.comments ?? {})) {
+          if (colKey === 'code') continue;
+          hist.push({ rowId: rid, colKey, before: null, after: nr.values[colKey] ?? null, at: action.at, by: cs.requesterId, changeSetId: cs.id, kind: 'created', comment });
+        }
       }
       const changeSets = s.changeSets.map((c) => c.id === cs.id
         ? { ...c, status: 'approved' as const, decidedBy: user.id, decidedAt: action.at, decisionComment: action.comment.trim() }

@@ -136,17 +136,22 @@ function ChangeSetCard({ cs, state, dispatch, open, onToggle }: {
 
           <div className="diff-wrap">
             <table className="diff">
-              <thead><tr><th>取引先</th><th>項目</th><th>変更前</th><th>変更後</th></tr></thead>
+              <thead><tr><th>取引先</th><th>項目</th><th>変更前</th><th>変更後</th><th>コメント</th></tr></thead>
               <tbody>
                 {cs.newRows.map((nr) => (
                   <tr key={nr.id} className="new">
                     <td><span className="mono">{String(nr.values.code ?? '')}</span> {String(nr.values.name ?? '')}</td>
-                    <td colSpan={3}>
+                    <td colSpan={4}>
                       <span className="tag ok">新規登録</span>{' '}
                       <span className="muted">
                         {state.columns.filter((c) => c.key !== 'code' && c.key !== 'name' && nr.values[c.key] != null)
                           .map((c) => `${c.label}：${canRead(c, user.role) ? formatValue(c, nr.values[c.key]) : MASK}`).join('／')}
                       </span>
+                      {Object.entries(nr.comments ?? {}).map(([k, comment]) => {
+                        const c = state.columns.find((x) => x.key === k);
+                        if (!c || !canRead(c, user.role)) return null;
+                        return <p key={k} className="row-comment"><Icon name="comment" /><span className="muted">{c.label}</span>{comment}</p>;
+                      })}
                     </td>
                   </tr>
                 ))}
@@ -160,6 +165,7 @@ function ChangeSetCard({ cs, state, dispatch, open, onToggle }: {
                       <td>{col.label}{col.sensitive && <span className="tag warn">機密</span>}</td>
                       <td className="before">{readable ? formatValue(col, ch.before) || '（空）' : MASK}</td>
                       <td className="after">{readable ? formatValue(col, ch.after) || '（空）' : MASK}</td>
+                      <td className="comment-cell">{ch.comment ? (readable ? ch.comment : MASK) : <span className="muted">—</span>}</td>
                     </tr>
                   );
                 })}

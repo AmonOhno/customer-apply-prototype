@@ -15,7 +15,8 @@ interface Props {
   cols: ColumnDef[];
   views: CellView[][];
   role: Role;
-  onApply: (cells: PlannedCell[]) => void;
+  /** comment: 反映するセルすべてに付けるコメント（未入力なら既存のコメントを残す） */
+  onApply: (cells: PlannedCell[], comment?: string) => void;
   onClose: () => void;
 }
 
@@ -33,6 +34,7 @@ export function BulkEditDialog({ rect, rows, cols, views, role, onApply, onClose
   const [tab, setTab] = useState<'set' | 'replace'>('set');
   const [find, setFind] = useState('');
   const [replace, setReplace] = useState('');
+  const [comment, setComment] = useState('');
 
   const targets = (c: number) => {
     let n = 0;
@@ -95,7 +97,7 @@ export function BulkEditDialog({ rect, rows, cols, views, role, onApply, onClose
             {errors.length > 0 && '（入力エラーがあっても下書きには入り、申請前に修正できます）'}
           </span>
           <button type="button" className="btn ghost" onClick={onClose}>キャンセル</button>
-          <button type="button" className="btn primary" disabled={!planned.length} onClick={() => onApply(planned)}>反映する</button>
+          <button type="button" className="btn primary" disabled={!planned.length} onClick={() => onApply(planned, comment.trim() ? comment : undefined)}>反映する</button>
         </>
       }
     >
@@ -168,6 +170,13 @@ export function BulkEditDialog({ rect, rows, cols, views, role, onApply, onClose
           )}
         </div>
       )}
+
+      <div className="bulk-comment">
+        <label htmlFor="bulk-comment">コメント（任意）</label>
+        <textarea id="bulk-comment" rows={2} value={comment} onChange={(e) => setComment(e.target.value)}
+          placeholder="例：本社移転に伴う住所変更（移転通知 10/28受領）" />
+        <p className="muted">反映する各セルに、申請の意図として付けます。承認者も確認できます。</p>
+      </div>
     </Modal>
   );
 }

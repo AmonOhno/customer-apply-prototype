@@ -98,7 +98,7 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
     return m;
   }, [cols]);
 
-  const applyPlanned = useCallback((cells: PlannedCell[]) => {
+  const applyPlanned = useCallback((cells: PlannedCell[], comment?: string) => {
     const edits: CellEdit[] = [];
     for (const p of cells) {
       const row = rows[p.r];
@@ -106,7 +106,7 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
       if (!row || !col) continue;
       const v = views[p.r][p.c];
       if (v.masked) continue;
-      edits.push({ rowId: row.id, colKey: col.key, value: coerce(col, p.raw) });
+      edits.push({ rowId: row.id, colKey: col.key, value: coerce(col, p.raw), comment });
     }
     if (edits.length) dispatch({ type: 'EDIT_CELLS', edits });
   }, [rows, cols, views, dispatch]);
@@ -294,6 +294,7 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
           <span key={s} className={`chip st-${s}`}><i />{STATUS_LABEL[s]}</span>
         ))}
         <span className="chip locked-chip"><Icon name="lock" />閲覧権限なし</span>
+        <span className="chip comment-chip"><i />コメントあり</span>
         <span className="hint">ドラッグ・Shift+クリックで範囲選択／入力後 Ctrl+Enter で範囲に一括入力／Excel から貼り付け可</span>
       </div>
 
@@ -344,7 +345,7 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
                       const cls = [
                         'cell', `st-${v.status}`, c.type === 'number' ? 'num' : '', c.key === 'code' ? 'mono' : '',
                         inSel ? 'sel' : '', isFocus ? 'focus' : '', v.lock ? 'locked' : '', v.masked ? 'masked' : '',
-                        v.error ? 'err' : '', left !== undefined ? 'frozen' : '',
+                        v.error ? 'err' : '', v.comment ? 'has-comment' : '', left !== undefined ? 'frozen' : '',
                       ].filter(Boolean).join(' ');
                       return (
                         <td
@@ -352,7 +353,10 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
                           data-cell={`${ri}:${ci}`}
                           className={cls}
                           style={left !== undefined ? { left } : undefined}
-                          title={v.error ?? (v.lock && v.lock !== 'no-read' ? LOCK_LABEL[v.lock] : v.masked ? LOCK_LABEL['no-read'] : undefined)}
+                          title={[
+                            v.error ?? (v.lock && v.lock !== 'no-read' ? LOCK_LABEL[v.lock] : v.masked ? LOCK_LABEL['no-read'] : undefined),
+                            v.comment && `コメント：${v.comment}`,
+                          ].filter(Boolean).join('\n') || undefined}
                           aria-selected={inSel}
                           onMouseDown={(e) => { if (e.button === 0) onCellDown({ r: ri, c: ci }, e.shiftKey); }}
                           onMouseEnter={() => { if (dragging.current && sel) setSel({ anchor: sel.anchor, focus: { r: ri, c: ci } }); }}
@@ -389,6 +393,7 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
           selCount={selCount}
           onEdit={() => sel && startEdit(sel.focus)}
           onRevert={(k) => dispatch({ type: 'DISCARD_DRAFTS', keys: [k] })}
+          onComment={(comment) => focusRow && focusCol && dispatch({ type: 'SET_CELL_COMMENT', rowId: focusRow.id, colKey: focusCol.key, comment })}
           onOpenChangeSet={onOpenChangeSet}
         />
       </div>
@@ -400,13 +405,14 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
           cols={cols}
           views={views}
           role={user.role}
-          onApply={(cells) => { applyPlanned(cells); setDialog(null); }}
+          onApply={(cells, comment) => { applyPlanned(cells, comment); setDialog(null); }}
           onClose={() => setDialog(null)}
         />
       )}
       {dialog === 'submit' && (
         <SubmitDialog
           state={state}
+          onComment={(rowId, colKey, comment) => dispatch({ type: 'SET_CELL_COMMENT', rowId, colKey, comment })}
           onSubmit={(title, comment) => {
             dispatch({ type: 'SUBMIT', title, comment, at: new Date().toISOString() });
             setDialog(null);

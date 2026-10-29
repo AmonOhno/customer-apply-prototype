@@ -164,6 +164,7 @@ textarea { resize: vertical; width: 100%; }
 .chip.st-approved i { background: var(--approved-bg); border-color: var(--approved); }
 .chip.st-clean i { background: var(--surface); border-color: var(--line-strong); }
 .locked-chip { color: var(--muted); }
+.comment-chip i { border: 0; border-radius: 0; background: linear-gradient(225deg, var(--accent) 0 5px, var(--line-strong) 5px 6px, transparent 6px); }
 
 /* ---------- Grid ---------- */
 .master-body { display: flex; gap: 12px; flex: 1; min-height: 0; }
@@ -231,6 +232,12 @@ textarea { resize: vertical; width: 100%; }
 .cell.st-approved { box-shadow: inset 3px 0 0 var(--approved); }
 .row-pending-new .cell { background: var(--pending-bg); }
 .cell.err { box-shadow: inset 0 0 0 1.5px var(--rejected); }
+/* セルコメントあり：右上の三角マーク */
+.cell.has-comment::before {
+  content: ""; position: absolute; top: 0; right: 0; width: 0; height: 0; pointer-events: none;
+  border-style: solid; border-width: 0 8px 8px 0; border-color: transparent var(--accent) transparent transparent;
+}
+.cell.has-comment.focus::before { top: 2px; right: 2px; }
 .err-mark {
   display: inline-grid; place-items: center; width: 14px; height: 14px; border-radius: 50%;
   background: var(--rejected); color: #fff; font-size: 10px; font-weight: 700; flex: none;
@@ -278,6 +285,20 @@ textarea { resize: vertical; width: 100%; }
 .hist-head { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; color: var(--muted); }
 .hist-head .tag { margin-left: 0; }
 .hist-diff { display: flex; flex-wrap: wrap; gap: 6px; overflow-wrap: anywhere; }
+.cell-comment { display: grid; gap: 4px; margin-top: 10px; }
+.cell-comment label { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; font-weight: 500; }
+.cell-comment label .muted { font-weight: 400; font-size: 11px; }
+.cell-comment p { margin: 0; font-size: 12px; }
+.comment-text { padding: 6px 8px; background: var(--surface-2); border-radius: var(--radius); white-space: pre-wrap; overflow-wrap: anywhere; }
+.hist-comment, .row-comment { display: flex; gap: 4px; align-items: flex-start; margin: 2px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hist-comment .icon, .row-comment .icon, .cell-comment .icon { width: 13px; height: 13px; flex: none; color: var(--accent); margin-top: 2px; }
+.row-comment .muted { flex: none; }
+.row-comment .muted::after { content: "："; }
+.comment-cell { min-width: 160px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-cell input { width: 100%; }
+.bulk-comment { display: grid; gap: 6px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+.bulk-comment label { font-weight: 500; }
+.bulk-comment p { margin: 0; font-size: 12px; }
 
 /* ---------- Modal ---------- */
 .backdrop {

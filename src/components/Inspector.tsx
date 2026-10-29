@@ -16,11 +16,12 @@ interface Props {
   selCount: number;
   onEdit: () => void;
   onRevert: (key: string) => void;
+  onComment: (comment: string) => void;
   onOpenChangeSet: (id: string) => void;
 }
 
 /** 選択中のセル・項目・行が持つプロパティを表示するパネル */
-export function Inspector({ state, row, col, view, selCount, onEdit, onRevert, onOpenChangeSet }: Props) {
+export function Inspector({ state, row, col, view, selCount, onEdit, onRevert, onComment, onOpenChangeSet }: Props) {
   const [open, setOpen] = useState(true);
   const user = currentUser(state);
   if (!row || !col || !view) {
@@ -34,6 +35,8 @@ export function Inspector({ state, row, col, view, selCount, onEdit, onRevert, o
   const show = (v: Parameters<typeof formatValue>[1]) => (readable ? (formatValue(col, v) || '（空）') : MASK);
   const userName = (id: string) => state.users.find((u) => u.id === id)?.name ?? id;
   const cs = view.changeSetId ? state.changeSets.find((c) => c.id === view.changeSetId) : undefined;
+  // コメントは自分の下書き（変更セル・新規行）にだけ付けられる
+  const commentable = !view.lock && (row.kind === 'draft-new' || !!draft);
 
   return (
     <aside className={`inspector ${open ? '' : 'closed'}`} aria-label="選択中セルの詳細">
@@ -68,6 +71,21 @@ export function Inspector({ state, row, col, view, selCount, onEdit, onRevert, o
                 </>
               )}
             </dl>
+            <div className="cell-comment">
+              <label htmlFor="insp-comment">
+                <Icon name="comment" />コメント<span className="muted">（申請の意図・承認者も確認します）</span>
+              </label>
+              {commentable ? (
+                <textarea id="insp-comment" rows={2} value={view.comment ?? ''} onChange={(e) => onComment(e.target.value)}
+                  placeholder="例：取引先からの変更届（10/28受領）に基づく" />
+              ) : view.comment ? (
+                <p id="insp-comment" className="comment-text">{view.comment}</p>
+              ) : (
+                <p id="insp-comment" className="muted">
+                  {!readable ? LOCK_LABEL['no-read'] : view.lock ? 'コメントはありません' : '値を変更すると、このセルにコメントを付けられます'}
+                </p>
+              )}
+            </div>
             <div className="insp-actions">
               {!view.lock && <button type="button" className="btn small" onClick={onEdit}><Icon name="pencil" />編集</button>}
               {draft && <button type="button" className="btn small ghost" onClick={() => onRevert(k)}><Icon name="undo" />元に戻す</button>}
@@ -114,6 +132,7 @@ export function Inspector({ state, row, col, view, selCount, onEdit, onRevert, o
                       {h.kind !== 'created' && <><span className="before">{show(h.before)}</span><span aria-hidden="true">→</span></>}
                       <span>{show(h.after)}</span>
                     </div>
+                    {h.comment && readable && <p className="hist-comment"><Icon name="comment" />{h.comment}</p>}
                     {h.changeSetId && <button type="button" className="link" onClick={() => onOpenChangeSet(h.changeSetId!)}>{h.changeSetId}</button>}
                   </li>
                 ))}
