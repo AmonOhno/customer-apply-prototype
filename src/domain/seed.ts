@@ -33,16 +33,22 @@ const BANKS = ['みずほ銀行 本店', '三井住友銀行 東京営業部', '
 
 const pad = (n: number, w: number) => String(n).padStart(w, '0');
 
+const DAY = 24 * 3600 * 1000;
+const daysBefore = (at: string, days: number) => new Date(Date.parse(at) - days * DAY).toISOString();
+/** 最終更新日時をばらつかせ、期間で絞り込むクエリを試せるようにする（直近1ヶ月：8件、1年以上前：4件） */
+const updatedDaysAgo = (i: number) => [2, 9, 15, 26][i % 4] + [0, 0, 90, 200, 420, 60][i % 6];
+
 export function seedRows(at: string): MasterRow[] {
   return COMPANIES.map(([name, kana, address], i) => {
     const n = i + 1;
     const isSupplier = i % 3 !== 1;
     const category = i % 5 === 0 ? '仕入先・得意先' : isSupplier ? '仕入先' : '得意先';
     const corp = `${(n * 7919) % 9 + 1}${pad((n * 104729) % 1_000_000_000_000, 12)}`;
+    const updated = updatedDaysAgo(i);
     return {
       id: `r-${pad(n, 3)}`,
-      createdAt: at,
-      updatedAt: at,
+      createdAt: daysBefore(at, updated + 365),
+      updatedAt: daysBefore(at, updated),
       values: {
         code: `${isSupplier ? 'V' : 'C'}${pad(n * 10 + 1, 5)}`,
         name,

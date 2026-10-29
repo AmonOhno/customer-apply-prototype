@@ -153,6 +153,21 @@ textarea { resize: vertical; width: 100%; }
 .draft-count { color: var(--muted); }
 .draft-count strong { color: var(--fg); font-variant-numeric: tabular-nums; font-size: 14px; }
 
+/* ---------- Query bar ---------- */
+.querybar { display: flex; flex-direction: column; gap: 4px; }
+.queries { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.querybar-label { flex-shrink: 0; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; color: var(--muted); font-size: 12px; margin-right: 2px; }
+.query {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line-strong);
+  border-radius: 999px; background: var(--surface); cursor: pointer; font-size: 12.5px; white-space: nowrap; flex-shrink: 0;
+}
+.query:hover { border-color: var(--accent); color: var(--accent); }
+.query.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.query .count { font-variant-numeric: tabular-nums; font-size: 11px; color: var(--muted); }
+.query.on .count { color: inherit; opacity: 0.85; }
+.query-desc { margin: 0; display: flex; flex-wrap: wrap; gap: 2px 12px; font-size: 12px; }
+.query-stat { font-variant-numeric: tabular-nums; white-space: nowrap; }
+
 .legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 11.5px; }
 .legend .hint { color: var(--muted); }
 .chip { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
@@ -459,6 +474,7 @@ textarea { resize: vertical; width: 100%; }
   .submit-group { margin-left: 0; width: 100%; justify-content: flex-end; }
   .submit-group .draft-count { margin-right: auto; }
   .legend .hint { display: none; }
+  .queries { flex-wrap: nowrap; overflow-x: auto; margin-inline: -16px; padding: 1px 16px 4px; scrollbar-width: none; }
   .views .long { display: none; }
   /* 狭い画面では列固定を解除し、行番号だけ固定する */
   .grid tbody td.frozen { position: relative; left: auto !important; }

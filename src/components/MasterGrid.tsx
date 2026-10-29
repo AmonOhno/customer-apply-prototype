@@ -11,6 +11,7 @@ import {
   inRect, parseTSV, planFillDown, planPaste, rectOf, rectSize, toTSV, type PlannedCell, type Pos, type Rect,
 } from '../domain/bulk.ts';
 import { coerce } from '../domain/validation.ts';
+import { applyQuery, QUERIES, queryById } from '../domain/queries.ts';
 import { BulkEditDialog } from './BulkEditDialog.tsx';
 import { SubmitDialog } from './SubmitDialog.tsx';
 import { Inspector } from './Inspector.tsx';
@@ -38,7 +39,7 @@ const rawText = (v: CellView): string => (v.masked || v.value === null ? '' : St
 export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
   const user = currentUser(state);
   const [query, setQuery] = useState('');
-  const [onlyChanged, setOnlyChanged] = useState(false);
+  const [queryId, setQueryId] = useState('all');
   const [rangeMode, setRangeMode] = useState(false);
   const [sel, setSel] = useState<Selection | null>({ anchor: { r: 0, c: 1 }, focus: { r: 0, c: 1 } });
   const [editing, setEditing] = useState<Editing | null>(null);
@@ -47,24 +48,25 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
   const gridRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const cols = state.columns;
   const ctx = useMemo(() => buildContext(state, user), [state, user]);
   const allRows = useMemo(() => buildGridRows(state, user), [state, user]);
+  const activeQuery = queryById(queryId);
 
-  const rows: GridRow[] = useMemo(() => {
+  // 検索語で絞った行に、クエリ（行条件・表示項目・並び順）を適用する
+  const searched: GridRow[] = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return allRows.filter((row) => {
-      if (onlyChanged) {
-        const changed = row.kind !== 'committed' || cols.some((c) => {
-          const s = cellView(ctx, row, c).status;
-          return s === 'draft' || s === 'pending' || s === 'rejected';
-        });
-        if (!changed) return false;
-      }
-      if (!q) return true;
-      return cols.some((c) => canRead(c, user.role) && String(row.values[c.key] ?? '').toLowerCase().includes(q));
-    });
-  }, [allRows, query, onlyChanged, cols, ctx, user.role]);
+    if (!q) return allRows;
+    return allRows.filter((row) =>
+      state.columns.some((c) => canRead(c, user.role) && String(row.values[c.key] ?? '').toLowerCase().includes(q)));
+  }, [allRows, query, state.columns, user.role]);
+
+  const queryCounts = useMemo(() => {
+    const now = Date.now();
+    return new Map(QUERIES.map((q) => [q.id, applyQuery(ctx, searched, q, now).rows.length]));
+  }, [ctx, searched]);
+
+  const { rows, columns: cols } = useMemo(() => applyQuery(ctx, searched, activeQuery), [ctx, searched, activeQuery]);
+  const hiddenCols = state.columns.length - cols.length;
 
   const views = useMemo(() => rows.map((row) => cols.map((c) => cellView(ctx, row, c))), [rows, cols, ctx]);
 
@@ -73,7 +75,8 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
     if (!sel) return;
     const maxR = Math.max(0, rows.length - 1);
     const clamp = (p: Pos): Pos => ({ r: Math.min(p.r, maxR), c: Math.min(p.c, cols.length - 1) });
-    if (sel.anchor.r > maxR || sel.focus.r > maxR) setSel({ anchor: clamp(sel.anchor), focus: clamp(sel.focus) });
+    const over = (p: Pos) => p.r > maxR || p.c > cols.length - 1;
+    if (over(sel.anchor) || over(sel.focus)) setSel({ anchor: clamp(sel.anchor), focus: clamp(sel.focus) });
   }, [rows.length, cols.length, sel]);
 
   useEffect(() => {
@@ -228,7 +231,9 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
 
   const addRow = () => {
     dispatch({ type: 'ADD_ROW' });
+    // 追加した行を全項目で入力できるようにする
     setQuery('');
+    setQueryId('all');
     requestAnimationFrame(() => {
       const el = scrollRef.current;
       if (el) el.scrollTop = el.scrollHeight;
@@ -273,10 +278,6 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
             <Icon name="search" />
             <input id="grid-search" type="search" placeholder="取引先名・コード・所在地で絞り込み" value={query} onChange={(e) => setQuery(e.target.value)} />
           </label>
-          <label className="check">
-            <input id="only-changed" type="checkbox" checked={onlyChanged} onChange={(e) => setOnlyChanged(e.target.checked)} />
-            変更がある行のみ
-          </label>
         </div>
         <div className="tool-group submit-group">
           <span className="draft-count" aria-live="polite">
@@ -287,6 +288,26 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
             <Icon name="send" />申請する
           </button>
         </div>
+      </div>
+
+      <div className="querybar">
+        <div className="queries" role="radiogroup" aria-label="クエリ">
+          <span className="querybar-label"><Icon name="filter" />クエリ</span>
+          {QUERIES.map((q) => (
+            <button key={q.id} type="button" role="radio" aria-checked={q.id === activeQuery.id}
+              className={`query ${q.id === activeQuery.id ? 'on' : ''}`} title={q.description}
+              onClick={() => { setQueryId(q.id); setSel({ anchor: { r: 0, c: 0 }, focus: { r: 0, c: 0 } }); }}>
+              {q.label}<span className="count">{queryCounts.get(q.id)}</span>
+            </button>
+          ))}
+        </div>
+        <p className="query-desc">
+          <span className="muted">{activeQuery.description}</span>
+          <span className="query-stat">
+            {rows.length}/{allRows.length}件
+            {hiddenCols > 0 && <>・{cols.length}/{state.columns.length}項目を表示</>}
+          </span>
+        </p>
       </div>
 
       <div className="legend" aria-label="セル状態の凡例">
@@ -380,7 +401,7 @@ export function MasterGrid({ state, dispatch, onOpenChangeSet }: Props) {
               </tbody>
             </table>
             {rows.length === 0 && (
-              <p className="empty">条件に合う取引先がありません。検索語を変えるか「変更がある行のみ」を外してください。</p>
+              <p className="empty">条件に合う取引先がありません。検索語を変えるか、クエリを「すべて」に戻してください。</p>
             )}
           </div>
         </div>
