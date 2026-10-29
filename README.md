@@ -54,6 +54,10 @@ npm run build        # 型チェック＋本番ビルド（dist/）
 npm run build:single # CDN版Reactを使う1ファイルHTML（dist-single/index.html）
 ```
 
+### 公開（GitHub Pages）
+
+`main` にプッシュすると `.github/workflows/deploy-pages.yml` がテスト・ビルドして https://amonohno.github.io/customer-apply-prototype/ に公開します。初回のみリポジトリの Settings → Pages → Source を「GitHub Actions」にしてください。
+
 ## 構成
 
 ```
