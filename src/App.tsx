@@ -6,10 +6,11 @@ import { ROLE_LABEL } from './domain/types.ts';
 import { MasterGrid } from './components/MasterGrid.tsx';
 import { WorkflowPanel } from './components/WorkflowPanel.tsx';
 import { ColumnSettings } from './components/ColumnSettings.tsx';
+import { RowAccessSettings } from './components/RowAccessSettings.tsx';
 import { Icon } from './components/Icon.tsx';
 
-type View = 'master' | 'workflow' | 'columns';
-const VIEWS: View[] = ['master', 'workflow', 'columns'];
+type View = 'master' | 'workflow' | 'columns' | 'access';
+const VIEWS: View[] = ['master', 'workflow', 'columns', 'access'];
 
 const viewFromHash = (): View => {
   const h = location.hash.replace('#', '') as View;
@@ -64,6 +65,9 @@ export function App() {
           <button type="button" className={view === 'columns' ? 'on' : ''} aria-current={view === 'columns' ? 'page' : undefined} onClick={() => go('columns')}>
             <Icon name="sliders" />項目設定
           </button>
+          <button type="button" className={view === 'access' ? 'on' : ''} aria-current={view === 'access' ? 'page' : undefined} onClick={() => go('access')}>
+            <Icon name="filter" />閲覧範囲
+          </button>
         </nav>
         <div className="who">
           <label htmlFor="user-switch" className="muted">操作ユーザー</label>
@@ -81,6 +85,7 @@ export function App() {
           <WorkflowPanel state={state} dispatch={dispatch} focusId={focusCs} onShowInGrid={() => go('master')} />
         )}
         {view === 'columns' && <ColumnSettings state={state} dispatch={dispatch} />}
+        {view === 'access' && <RowAccessSettings state={state} dispatch={dispatch} />}
       </main>
 
       <footer className="appfoot">

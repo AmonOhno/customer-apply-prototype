@@ -17,11 +17,15 @@ const query = (s: AppState, id: string) => {
 };
 const keys = (r: ReturnType<typeof query>) => r.columns.map((c) => c.key);
 
-test('すべて: 全行・全項目を表示する', () => {
+test('すべて: 閲覧範囲内の全行と、閲覧権限のある全項目を表示する', () => {
   const s = createInitialState(AT);
-  const r = query(s, 'all');
-  assert.equal(r.rows.length, s.rows.length);
-  assert.equal(r.columns.length, s.columns.length);
+  const r = query(s, 'all'); // 営業担当：取引中のみ、口座・与信は閲覧不可
+  assert.equal(r.rows.length, s.rows.filter((x) => x.values.status === '取引中').length);
+  assert.ok(!keys(r).includes('bank') && !keys(r).includes('creditLimit'));
+  assert.equal(r.columns.length, s.columns.length - 2);
+  const admin = query(run(s, as('u-takahashi')), 'all');
+  assert.equal(admin.rows.length, s.rows.length);
+  assert.equal(admin.columns.length, s.columns.length);
 });
 
 test('変更箇所のみ: 変更した行と項目だけ（固定列は常に表示）', () => {
@@ -98,9 +102,10 @@ test('インボイス番号未登録: 確定値で判定し、下書き入力中
   assert.ok(query(s, 'invoice-missing').rows.some((x) => x.id === target.id));
 });
 
-test('支払・与信項目: 指定項目のみ。閲覧権限のない項目は列として残りマスク表示される', () => {
-  const r = query(createInitialState(AT), 'payment');
-  assert.deepEqual(keys(r), ['code', 'name', 'category', 'invoiceNo', 'paymentTerms', 'bank', 'creditLimit', 'status']);
+test('支払・与信項目: 指定項目のみ。閲覧権限のない項目は列として表示しない', () => {
+  const s = createInitialState(AT);
+  assert.deepEqual(keys(query(s, 'payment')), ['code', 'name', 'category', 'invoiceNo', 'paymentTerms', 'status']);
+  assert.deepEqual(keys(query(run(s, as('u-sato')), 'payment')), ['code', 'name', 'category', 'invoiceNo', 'paymentTerms', 'bank', 'creditLimit', 'status']);
 });
 
 test('閲覧権限のない項目の条件には該当しない', () => {

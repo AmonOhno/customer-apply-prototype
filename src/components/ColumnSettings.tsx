@@ -20,7 +20,7 @@ export function ColumnSettings({ state, dispatch }: { state: AppState; dispatch:
       <div className="settings-head">
         <p>
           項目ごとに、閲覧・編集できるロール、必須かどうか、承認が必要かどうかを設定します。
-          閲覧権限のないロールには値が <span className="mono">••••••</span> で表示され、コピーもできません。
+          閲覧権限のないロールには、その項目（列）が表示されません。取引先（行）の閲覧範囲は「閲覧範囲」画面で設定します。
         </p>
         {!admin && <p className="callout">設定を変更できるのはマスタ管理者のみです。画面右上で「高橋 管理者」に切り替えてください。</p>}
       </div>

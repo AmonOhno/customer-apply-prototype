@@ -1,7 +1,8 @@
-import { canAddRow, canApprove, canManageColumns, currentUser, lockReason, pendingIndex } from './permissions.ts';
+import { canAddRow, canApprove, canManageColumns, canManageRowAccess, currentUser, lockReason, pendingIndex } from './permissions.ts';
+import { canSeeRow } from './rowAccess.ts';
 import { PAYMENT_TERMS } from './columns.ts';
 import type {
-  AppState, CellChange, CellValue, ChangeSet, ColumnDef, HistoryEntry, NewRow, Role, UserDrafts,
+  AppState, CellChange, CellValue, ChangeSet, ColumnDef, HistoryEntry, NewRow, Role, RowAccessRule, UserDrafts,
 } from './types.ts';
 import { cellKey, splitCellKey } from './types.ts';
 import { sameValue, validateValue } from './validation.ts';
@@ -26,6 +27,9 @@ export type Action =
   | { type: 'REJECT'; changeSetId: string; comment: string; at: string }
   | { type: 'WITHDRAW'; changeSetId: string; at: string }
   | { type: 'UPDATE_COLUMN'; key: string; patch: Partial<Pick<ColumnDef, 'label' | 'readRoles' | 'editRoles' | 'required' | 'approvalRequired' | 'sensitive'>> }
+  | { type: 'ADD_ROW_ACCESS' }
+  | { type: 'UPDATE_ROW_ACCESS'; id: string; patch: Partial<Pick<RowAccessRule, 'label' | 'conditions' | 'roles'>> }
+  | { type: 'REMOVE_ROW_ACCESS'; id: string }
   | { type: 'DISMISS_NOTICE' }
   | { type: 'RESET'; state: AppState };
 
@@ -135,7 +139,7 @@ export function reducer(state: AppState, action: Action): AppState {
           continue;
         }
         const row = state.rows.find((r) => r.id === e.rowId);
-        if (!row || lockReason(state, user, row.id, 'committed', col, pending)) { skipped++; continue; }
+        if (!row || !canSeeRow(state, user.role, row.id) || lockReason(state, user, row.id, 'committed', col, pending)) { skipped++; continue; }
         const k = cellKey(row.id, col.key);
         const base = row.values[col.key] ?? null;
         if (sameValue(e.value, base)) delete cells[k];
@@ -341,6 +345,22 @@ export function reducer(state: AppState, action: Action): AppState {
         return n;
       });
       return { ...state, columns };
+    }
+
+    case 'ADD_ROW_ACCESS': {
+      if (!canManageRowAccess(user.role)) return err(state, '閲覧範囲を変更する権限がありません');
+      const [id, s] = nextId(state, 'ra');
+      return { ...s, rowAccess: [...s.rowAccess, { id, label: '新しい閲覧範囲', conditions: [], roles: [] }] };
+    }
+
+    case 'UPDATE_ROW_ACCESS': {
+      if (!canManageRowAccess(user.role)) return err(state, '閲覧範囲を変更する権限がありません');
+      return { ...state, rowAccess: state.rowAccess.map((r) => r.id === action.id ? { ...r, ...action.patch } : r) };
+    }
+
+    case 'REMOVE_ROW_ACCESS': {
+      if (!canManageRowAccess(user.role)) return err(state, '閲覧範囲を変更する権限がありません');
+      return { ...state, rowAccess: state.rowAccess.filter((r) => r.id !== action.id) };
     }
   }
 }

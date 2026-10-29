@@ -10,6 +10,8 @@ export const canApprove = (role: Role): boolean => role === 'approver' || role =
 
 export const canManageColumns = (role: Role): boolean => role === 'admin';
 
+export const canManageRowAccess = (role: Role): boolean => role === 'admin';
+
 /** 新規行を追加できるのは、取引先コードを入力できるロール */
 export const canAddRow = (state: AppState, role: Role): boolean => {
   const code = state.columns.find((c) => c.key === 'code');
