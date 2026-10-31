@@ -52,7 +52,27 @@ npm run dev          # 開発サーバー
 npm test             # ドメイン層のテスト（Node 22.18+ の型除去で実行、追加依存なし）
 npm run build        # 型チェック＋本番ビルド（dist/）
 npm run build:single # CDN版Reactを使う1ファイルHTML（dist-single/index.html）
+npm run test:e2e     # E2E（Playwright。本番ビルドを vite preview で配信して確認）
 ```
+
+E2E を初めて実行する前に `npx playwright install chromium` でブラウザを入れてください。CI と同じ条件で確認するには `CI=1 npx playwright test --retries=0` を実行します。
+
+### CI（Pull Request）
+
+PR の作成・更新（opened / synchronize / reopened / ready_for_review）で次のワークフローが動きます。
+
+| ワークフロー | 内容 |
+| --- | --- |
+| `.github/workflows/e2e.yml`（E2E / ジョブ名 `e2e`） | 型チェック・ユニットテスト（`npm test`）・E2E（`e2e/`、Playwright＋Chromium）を実行。**1件でも失敗すればジョブ失敗**。リトライは無効（`--retries=0`）なので、再実行で通った flaky も合格扱いにしません。失敗時のレポート・トレースは Artifacts（`playwright-report`）に保存 |
+| `.github/workflows/claude-code-review.yml`（Claude Code Review） | Claude Code の公式 code-review プラグイン（`code-review@claude-plugins-official`）で PR をレビューし、指摘を PR にコメント。ドラフト PR とフォークからの PR は対象外 |
+
+#### 初回のみ必要な設定
+
+1. **Claude GitHub App のインストール**：https://github.com/apps/claude からこのリポジトリにインストールします（Claude Code で `/install-github-app` を実行しても設定できます）。
+2. **Secrets の登録**：Settings → Secrets and variables → Actions → New repository secret で、次の**どちらか一方**を登録します。
+   - `ANTHROPIC_API_KEY`：Anthropic Console で発行した API キー（従量課金）
+   - `CLAUDE_CODE_OAUTH_TOKEN`：Claude の Pro / Max プランで使う場合。ローカルで `claude setup-token` を実行して発行
+3. **E2E を必須チェックにする（ブランチ保護）**：Settings → Branches → Add branch ruleset（または Add classic branch protection rule）で対象ブランチに `main` を指定し、「Require status checks to pass」を有効にして、ステータスチェックに `e2e` を追加します（候補は一度ワークフローが実行されると表示されます）。これで E2E が失敗している PR はマージできなくなります。Code Review はコメントを付けるだけなので必須にはしない想定です。
 
 ### 公開（GitHub Pages）
 
@@ -73,6 +93,9 @@ src/
     bulk.ts          TSV 解析、貼り付け・下へコピー・置換の計画
   components/        React コンポーネント（表、一括編集、申請、ワークフロー、項目設定、プロパティパネル）
   store.ts           useReducer＋localStorage 永続化
+e2e/
+  smoke.spec.ts      主要フロー（表示・画面切替・申請→承認→反映）のスモーク E2E
+playwright.config.ts E2E の設定（リトライなし、本番ビルドを配信して実行）
 ```
 
 状態遷移はすべて `domain/reducer.ts` の純粋関数に集約しているため、API／DB を付ける場合は reducer の各アクションをサーバー側のユースケースに移す形で拡張できます。
