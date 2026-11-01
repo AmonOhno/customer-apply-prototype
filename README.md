@@ -1,5 +1,33 @@
 # 取引先マスタ（表形式マスタ保守＋承認ワークフロー）
 
+## アーキテクチャ概要
+
+ブラウザだけで完結する React SPA です（API・DB なし、状態は localStorage）。GitHub Actions でビルドし GitHub Pages に公開します。
+
+```mermaid
+C4Context
+  title System Context: 取引先マスタ（表形式マスタ保守＋承認ワークフロー）
+
+  Person(requester, "営業担当 / 経理担当", "取引先情報を編集し変更を申請する")
+  Person(approver, "承認者", "変更セットを承認・差戻しする")
+  Person(admin, "マスタ管理者", "全項目の編集・承認、項目設定、閲覧範囲設定")
+
+  System(app, "取引先マスタ SPA", "ブラウザ内で完結する表形式マスタ保守・承認ワークフロー")
+
+  System_Ext(pages, "GitHub Pages", "静的ファイルの配信")
+  System_Ext(fonts, "Google Fonts", "Web フォント配信")
+  System_Ext(gha, "GitHub / GitHub Actions", "ソース管理・テスト・ビルド・デプロイ")
+
+  Rel(requester, app, "編集・申請・取り下げ")
+  Rel(approver, app, "承認・差戻し")
+  Rel(admin, app, "編集・承認・設定")
+  Rel(app, pages, "HTML/JS/CSS を取得", "HTTPS")
+  Rel(app, fonts, "フォントを取得", "HTTPS")
+  Rel(gha, pages, "dist/ をデプロイ")
+```
+
+Container 図・Component 図・データフローは [docs/architecture.md](docs/architecture.md) を参照してください。
+
 取引先マスタを Excel のような表で編集し、変更を **変更セット単位** で申請・承認するプロトタイプです。
 セル・項目（カラム）・行それぞれに業務上のプロパティ（変更ステータス、閲覧・編集権限、必須、承認要否、機密区分など）を持たせています。
 
